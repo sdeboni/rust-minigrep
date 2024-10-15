@@ -24,7 +24,18 @@ impl SearchParamsBuilder {
     }
 
     fn build(self) -> Result<SearchParams, Error> {
-        Err(Error::Client("blah".to_string()))
+        match self.args {
+            Some(a) => {
+                if a.len() == 2 {
+                    return Ok(SearchParams {
+                        query: a[0].to_string(),
+                        data: DataSource::FilePath(a[1].to_string()),
+                    });
+                }
+                Err(Error::Client("blah".to_string()))
+            }
+            None => Err(Error::Client("blah".to_string())),
+        }
     }
 }
 
