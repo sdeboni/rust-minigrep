@@ -1,4 +1,4 @@
-use crate::{DataSource, Error, InMemoryData, SearchParams};
+use crate::{DataSource, Error, FileData, InMemoryData, SearchParams};
 
 pub struct SearchParamsBuilder {
     args: Option<Vec<String>>,
@@ -43,7 +43,7 @@ impl SearchParamsBuilder {
             Some(a) => match a.len() {
                 2 => Ok(SearchParams {
                     query: a[0].clone(),
-                    data: DataSource::FilePath(a[1].clone()),
+                    data: DataSource::File(FileData::new(&a[1])?),
                 }),
                 1 => SearchParamsBuilder::get_search_parms_for_in_memory_data(
                     a[0].clone(),
@@ -65,42 +65,51 @@ mod tests {
 
     #[test]
     fn handles_file_path_search_args() {
-        let expected_search_params = SearchParams {
-            query: "arg1".to_string(),
-            data: DataSource::FilePath("arg2".to_string()),
-        };
+        let path = "/home/sdeboni/projects/minigrep/test.dat".to_string();
 
         let result = SearchParamsBuilder::new()
-            .args(&["arg1".to_string(), "arg2".to_string()])
+            .args(&["query".to_string(), path.clone()])
             .build();
 
         match result {
-            Ok(search_params) => assert_eq!(expected_search_params, search_params),
+            Ok(search_params) => {
+                assert_eq!("query", search_params.query);
+                if let DataSource::File(file_data) = search_params.data {
+                    assert_eq!(path, file_data.path);
+                } else {
+                    panic!("expected data_source to be of file type");
+                }
+            }
             Err(Error::Client(err)) => {
-                panic!("{}", format!("got unexpected error: {}", err.to_string()))
+                panic!("{}", format!("got unexpected client error: {}", err))
+            }
+            Err(Error::Server(err)) => {
+                panic!("{}", format!("got unexpected server error: {}", err))
             }
         }
     }
 
     #[test]
     fn handles_stub_data() {
-        let expected_search_params = SearchParams {
-            query: "query".to_string(),
-            data: DataSource::InMemory(InMemoryData {
-                data: vec!["line1".to_string(), "line2".to_string()],
-                idx: 0,
-            }),
-        };
-
         let result = SearchParamsBuilder::new()
             .args(&["query".to_string()])
             .in_memory_data(vec!["line1".to_string(), "line2".to_string()])
             .build();
 
         match result {
-            Ok(search_params) => assert_eq!(expected_search_params, search_params),
+            Ok(search_params) => {
+                assert_eq!("query", search_params.query);
+                if let DataSource::InMemory(in_memory) = search_params.data {
+                    assert_eq!(2, in_memory.data.len());
+                } else {
+                    panic!("expected InMemory data source");
+                }
+            }
             Err(Error::Client(err)) => {
-                panic!("{}", format!("got unexpected error: {}", err.to_string()))
+                panic!("{}", format!("got unexpected client error: {}", err))
+            }
+            Err(Error::Server(err)) => {
+                panic!("{}", format!("got unexpected server error: {}", err))
             }
         }
     }
