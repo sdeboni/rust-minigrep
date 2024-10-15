@@ -3,11 +3,11 @@ mod search_params;
 #[derive(Debug, PartialEq)]
 enum DataSource {
     FilePath(String),
-    MemorySource(MemorySource),
+    InMemory(InMemoryData),
 }
 
 #[derive(Debug, PartialEq)]
-struct MemorySource {
+struct InMemoryData {
     data: Vec<String>,
     idx: usize,
 }
