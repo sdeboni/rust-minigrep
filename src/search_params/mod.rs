@@ -1,4 +1,13 @@
-use crate::{DataSource, Error, FileData, InMemoryData, SearchParams};
+use crate::data_reader::file_reader::FileData;
+use crate::data_reader::in_memory_reader::InMemoryData;
+use crate::data_reader::DataReader;
+
+use crate::Error;
+
+pub struct SearchParams {
+    query: String,
+    data: Box<dyn DataReader>,
+}
 
 pub struct SearchParamsBuilder {
     args: Option<Vec<String>>,
@@ -13,12 +22,12 @@ impl SearchParamsBuilder {
         }
     }
 
-    fn args(mut self, args: &[String]) -> SearchParamsBuilder {
+    pub fn args(mut self, args: &[String]) -> SearchParamsBuilder {
         self.args = Some(args.to_vec());
         self
     }
 
-    fn in_memory_data(mut self, data: Vec<String>) -> SearchParamsBuilder {
+    pub fn in_memory_data(mut self, data: Vec<String>) -> SearchParamsBuilder {
         self.in_memory_data = Some(data);
         self
     }
@@ -30,7 +39,7 @@ impl SearchParamsBuilder {
         match data {
             Some(dat) => Ok(SearchParams {
                 query,
-                data: DataSource::InMemory(InMemoryData { data: dat, idx: 0 }),
+                data: Box::new(InMemoryData::new(dat)),
             }),
             None => Err(Error::Client(
                 "no file path or in-memory data provided".to_string(),
@@ -38,12 +47,12 @@ impl SearchParamsBuilder {
         }
     }
 
-    fn build(self) -> Result<SearchParams, Error> {
+    pub fn build(self) -> Result<SearchParams, Error> {
         match self.args {
             Some(a) => match a.len() {
                 2 => Ok(SearchParams {
                     query: a[0].clone(),
-                    data: DataSource::File(FileData::new(&a[1])?),
+                    data: Box::new(FileData::new(&a[1])?),
                 }),
                 1 => SearchParamsBuilder::get_search_parms_for_in_memory_data(
                     a[0].clone(),
@@ -74,10 +83,11 @@ mod tests {
         match result {
             Ok(search_params) => {
                 assert_eq!("query", search_params.query);
-                if let DataSource::File(file_data) = search_params.data {
-                    assert_eq!(path, file_data.path);
-                } else {
-                    panic!("expected data_source to be of file type");
+                let mut reader: Box<dyn DataReader> = search_params.data;
+
+                match reader.next() {
+                    Some(line) => assert_eq!("file_line1", line),
+                    None => panic!("unexpeced EOF"),
                 }
             }
             Err(Error::Client(err)) => {
@@ -99,10 +109,11 @@ mod tests {
         match result {
             Ok(search_params) => {
                 assert_eq!("query", search_params.query);
-                if let DataSource::InMemory(in_memory) = search_params.data {
-                    assert_eq!(2, in_memory.data.len());
-                } else {
-                    panic!("expected InMemory data source");
+                let mut reader: Box<dyn DataReader> = search_params.data;
+
+                match reader.next() {
+                    Some(line) => assert_eq!("line1", line),
+                    None => panic!("unexpeced EOF"),
                 }
             }
             Err(Error::Client(err)) => {
