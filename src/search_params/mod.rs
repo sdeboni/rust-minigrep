@@ -1,12 +1,22 @@
-use crate::data_reader::file_reader::FileData;
-use crate::data_reader::in_memory_reader::InMemoryData;
+use crate::data_reader::file_reader::FileReader;
+use crate::data_reader::in_memory_reader::InMemoryReader;
 use crate::data_reader::DataReader;
 
-use crate::Error;
+use crate::AppError;
 
 pub struct SearchParams {
     query: String,
-    data: Box<dyn DataReader>,
+    reader: Box<dyn DataReader>,
+}
+
+impl SearchParams {
+    pub fn exec(&mut self, out: &mut Vec<String>) {
+        if let Some(line) = self.reader.next() {
+            if line.contains(&self.query) {
+                out.push(line);
+            }
+        }
+    }
 }
 
 pub struct SearchParamsBuilder {
@@ -35,35 +45,35 @@ impl SearchParamsBuilder {
     fn get_search_parms_for_in_memory_data(
         query: String,
         data: Option<Vec<String>>,
-    ) -> Result<SearchParams, Error> {
+    ) -> Result<SearchParams, AppError> {
         match data {
             Some(dat) => Ok(SearchParams {
                 query,
-                data: Box::new(InMemoryData::new(dat)),
+                reader: Box::new(InMemoryReader::new(dat)),
             }),
-            None => Err(Error::Client(
+            None => Err(AppError::Client(
                 "no file path or in-memory data provided".to_string(),
             )),
         }
     }
 
-    pub fn build(self) -> Result<SearchParams, Error> {
+    pub fn build(self) -> Result<SearchParams, AppError> {
         match self.args {
             Some(a) => match a.len() {
                 2 => Ok(SearchParams {
                     query: a[0].clone(),
-                    data: Box::new(FileData::new(&a[1])?),
+                    reader: Box::new(FileReader::new(&a[1])?),
                 }),
                 1 => SearchParamsBuilder::get_search_parms_for_in_memory_data(
                     a[0].clone(),
                     self.in_memory_data,
                 ),
-                _ => Err(Error::Client(format!(
+                _ => Err(AppError::Client(format!(
                     "expeced 1 or 2 arguments, got {}",
                     a.len()
                 ))),
             },
-            None => Err(Error::Client("blah".to_string())),
+            None => Err(AppError::Client("blah".to_string())),
         }
     }
 }
@@ -83,17 +93,17 @@ mod tests {
         match result {
             Ok(search_params) => {
                 assert_eq!("query", search_params.query);
-                let mut reader: Box<dyn DataReader> = search_params.data;
+                let mut reader: Box<dyn DataReader> = search_params.reader;
 
                 match reader.next() {
                     Some(line) => assert_eq!("file_line1", line),
                     None => panic!("unexpeced EOF"),
                 }
             }
-            Err(Error::Client(err)) => {
+            Err(AppError::Client(err)) => {
                 panic!("{}", format!("got unexpected client error: {}", err))
             }
-            Err(Error::Server(err)) => {
+            Err(AppError::Server(err)) => {
                 panic!("{}", format!("got unexpected server error: {}", err))
             }
         }
@@ -109,19 +119,36 @@ mod tests {
         match result {
             Ok(search_params) => {
                 assert_eq!("query", search_params.query);
-                let mut reader: Box<dyn DataReader> = search_params.data;
+                let mut reader: Box<dyn DataReader> = search_params.reader;
 
                 match reader.next() {
                     Some(line) => assert_eq!("line1", line),
                     None => panic!("unexpeced EOF"),
                 }
             }
-            Err(Error::Client(err)) => {
+            Err(AppError::Client(err)) => {
                 panic!("{}", format!("got unexpected client error: {}", err))
             }
-            Err(Error::Server(err)) => {
+            Err(AppError::Server(err)) => {
                 panic!("{}", format!("got unexpected server error: {}", err))
             }
+        }
+    }
+
+    #[test]
+    fn outputs_query_match() {
+        match SearchParamsBuilder::new()
+            .args(&["line1".to_string()])
+            .in_memory_data(vec!["line1".to_string(), "line2".to_string()])
+            .build()
+        {
+            Ok(mut search) => {
+                let mut out: Vec<String> = vec![];
+                search.exec(&mut out);
+                assert_eq!(1, out.len());
+                assert_eq!("line1", out[0]);
+            }
+            Err(err) => panic!("{}", err),
         }
     }
 }

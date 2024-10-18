@@ -1,11 +1,11 @@
 use crate::data_reader::DataReader;
 
-pub struct InMemoryData {
+pub struct InMemoryReader {
     data: Vec<String>,
     idx: usize,
 }
 
-impl DataReader for InMemoryData {
+impl DataReader for InMemoryReader {
     fn next(&mut self) -> Option<String> {
         if self.idx < self.data.len() {
             let next = &self.data[self.idx];
@@ -16,9 +16,9 @@ impl DataReader for InMemoryData {
     }
 }
 
-impl InMemoryData {
-    pub fn new(data: Vec<String>) -> InMemoryData {
-        InMemoryData { data, idx: 0 }
+impl InMemoryReader {
+    pub fn new(data: Vec<String>) -> InMemoryReader {
+        InMemoryReader { data, idx: 0 }
     }
 }
 
@@ -29,7 +29,7 @@ mod test {
 
     #[test]
     fn retrieves_in_memory_data() {
-        let mut data_reader = InMemoryData {
+        let mut data_reader = InMemoryReader {
             data: vec!["line1".to_string(), "line2".to_string()],
             idx: 0,
         };
@@ -51,7 +51,7 @@ mod test {
 
     #[test]
     fn handles_empty_in_memory_data() {
-        let mut data_reader = InMemoryData {
+        let mut data_reader = InMemoryReader {
             data: vec![],
             idx: 0,
         };

@@ -4,26 +4,29 @@ use std::io::BufRead;
 use std::path::Path;
 
 use crate::data_reader::DataReader;
-use crate::Error;
+use crate::AppError;
 
-pub struct FileData {
+pub struct FileReader {
     path: String,
     lines: std::iter::Flatten<io::Lines<io::BufReader<File>>>,
 }
 
-impl FileData {
-    pub fn new(path: &str) -> Result<FileData, Error> {
+impl FileReader {
+    pub fn new(path: &str) -> Result<FileReader, AppError> {
         match read_lines(path) {
-            Ok(lines) => Ok(FileData {
+            Ok(lines) => Ok(FileReader {
                 path: path.to_string(),
                 lines: lines.flatten(),
             }),
-            Err(err) => Err(Error::Client(format!("failed to open {}: {}", path, err))),
+            Err(err) => Err(AppError::Client(format!(
+                "failed to open {}: {}",
+                path, err
+            ))),
         }
     }
 }
 
-impl DataReader for FileData {
+impl DataReader for FileReader {
     fn next(&mut self) -> Option<String> {
         self.lines.next()
     }
